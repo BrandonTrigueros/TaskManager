@@ -1,0 +1,14 @@
+# ─── Secrets ───
+.env
+
+# ─── Virtual environment ───
+.venv/
+
+# ─── Python ───
+__pycache__/
+*.pyc
+*.egg-info/
+
+# ─── OS ───
+.DS_Store
+Thumbs.db
