@@ -10,10 +10,17 @@ metadata: { "openclaw": { "emoji": "🧠", "os": ["linux"], "requires": { "bins"
 
 This skill is the default for the **tasks** Telegram bot.
 
+## Setup
+
+Before running any tool, activate the virtualenv:
+```bash
+cd ~/TaskManager && source .venv/bin/activate
+```
+
 ## Auto-Whiteboard Directive
 
 **Any image received on this channel is a whiteboard or notebook photo.** Process it immediately:
-1. Run `python3 -m src.tools.SharedUtilities.ocr whiteboard /tmp/photo.jpg` from the TaskManager project root
+1. Run `cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.SharedUtilities.ocr whiteboard /tmp/photo.jpg`
 2. For each extracted task, run `python3 -m src.tools.TaskManager.classify_task "..."`
 3. Insert all with `python3 -m src.tools.TaskManager.tasks add ...`
 4. Report all created tasks — no confirmation needed
@@ -24,11 +31,11 @@ Manages Brandon's tasks across university (UCR), work (HPE), and personal life u
 
 ## Tool Scripts
 
-All tools are Python modules run from the `TaskManager/` project root:
+All tools are Python modules. **Always run from `~/TaskManager` with the venv active.**
 
 ### Create a task
 ```bash
-python3 -m src.tools.TaskManager.tasks add \
+cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.TaskManager.tasks add \
   --title "Terminar Lab 2 de Empotrados" \
   --project "Empotrados" \
   --priority 4 \
@@ -38,28 +45,33 @@ python3 -m src.tools.TaskManager.tasks add \
 
 ### AI-classify a task (returns JSON with project_tag, priority, estimated_hours)
 ```bash
-python3 -m src.tools.TaskManager.classify_task "Corregir el paper de detección de objetos"
+cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.TaskManager.classify_task "Corregir el paper de detección de objetos"
 ```
 
 ### List pending tasks
 ```bash
-python3 -m src.tools.TaskManager.tasks list --status pending
-python3 -m src.tools.TaskManager.tasks list --status pending --project "HPE"
+cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.TaskManager.tasks list --status pending
+cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.TaskManager.tasks list --status pending --project "HPE"
 ```
 
 ### Complete a task
 ```bash
-python3 -m src.tools.TaskManager.tasks complete --id 42
+cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.TaskManager.tasks complete --id 42
 ```
 
 ### List overdue tasks
 ```bash
-python3 -m src.tools.TaskManager.tasks overdue
+cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.TaskManager.tasks overdue
+```
+
+### Export to Markdown/Obsidian
+```bash
+cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.SharedUtilities.export_md --output ~/Obsidian/TaskManager/
 ```
 
 ### OCR whiteboard/notebook photo
 ```bash
-python3 -m src.tools.SharedUtilities.ocr whiteboard /tmp/photo.jpg
+cd ~/TaskManager && source .venv/bin/activate && python3 -m src.tools.SharedUtilities.ocr whiteboard /tmp/photo.jpg
 ```
 Returns a JSON array of extracted task strings. For each extracted task, run `classify_task` and then `tasks add`.
 

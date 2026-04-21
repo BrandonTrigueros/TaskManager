@@ -45,6 +45,7 @@ def main():
         print("  cli.py overdue                          → tareas vencidas")
         print("  cli.py classify \"texto\"                  → clasificar con IA")
         print("  cli.py ocr-whiteboard /path/to/img      → OCR de pizarra")
+        print("  cli.py export [--output /path/to/dir]   → exportar a Markdown")
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -73,6 +74,11 @@ def main():
             print("Uso: cli.py ocr-receipt /path/to/photo.jpg")
             sys.exit(1)
         tool("src.tools.SharedUtilities.ocr", "receipt", sys.argv[2])
+
+    # ─── Markdown export ────────────────────────────────────
+    elif cmd == "export":
+        extra = sys.argv[2:]
+        tool("src.tools.SharedUtilities.export_md", *extra)
 
     # ─── Default: treat entire input as a new task ──────────
     else:

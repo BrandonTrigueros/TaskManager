@@ -1,0 +1,49 @@
+{
+  // ─── TaskManager — OpenClaw Configuration ───
+  // This is a standalone config for the TaskManager module.
+  // When merging with BT-Core, integrate into the full openclaw.json.
+
+  // ─── Agent Model ───
+  "agent": {
+    "model": "google/gemini-2.0-pro",
+    "thinkingLevel": "medium"
+  },
+
+  // ─── Gateway ───
+  "gateway": {
+    "port": 18789,
+    "bind": "0.0.0.0"
+  },
+
+  // ─── Telegram (Tasks Bot) ───
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": "CONFIGURE_ME_TASKS_BOT_TOKEN",
+      "dmPolicy": "allowlist",
+      "allowFrom": ["CONFIGURE_ME_YOUR_TELEGRAM_USER_ID"]
+    }
+  },
+
+  // ─── Skills ───
+  "skills": {
+    "entries": {
+      "taskmanager": {
+        "enabled": true,
+        "env": {
+          "DB_HOST": "localhost",
+          "DB_PORT": "5432",
+          "POSTGRES_USER": "hb_admin",
+          "POSTGRES_PASSWORD": "CONFIGURE_ME",
+          "POSTGRES_DB": "heartbeat",
+          "GEMINI_API_KEY": "CONFIGURE_ME_GEMINI_API_KEY"
+        }
+      }
+    }
+  },
+
+  // ─── Logging ───
+  "logging": {
+    "level": "info"
+  }
+}
