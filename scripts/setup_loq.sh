@@ -1,192 +1,145 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─── TaskManager — LOQ Hub Setup ────────────────────────────────
-# Installs OpenClaw, PostgreSQL (Docker), Python deps, and links the skill.
+# ═══════════════════════════════════════════════════════════════
+# BT-Core TaskManager — Setup (LOQ Hub / cualquier PC)
 #
-# Prerequisites on LOQ (WSL2 or native Linux):
-#   - Node.js 22+ (or 24)
-#   - Docker (Docker Desktop on WSL2 or docker-ce)
-#   - Python 3.11+
-#   - Tailscale connected
+# Qué hace:
+#   1. Verifica prerequisites (Docker, Python, Ollama)
+#   2. Crea .env desde .env.example si no existe
+#   3. Baja el modelo de embeddings (nomic-embed-text)
+#   4. Levanta todo con docker compose up -d
 #
-# Usage:
-#   1. Clone the repo:  git clone https://github.com/BrandonTrigueros/TaskManager.git ~/TaskManager
-#   2. Run:             cd ~/TaskManager && bash scripts/setup_loq.sh
-#   3. Edit .env with real values (Telegram token, Gemini key, DB password)
-#   4. Restart:         openclaw gateway restart
-# ─────────────────────────────────────────────────────────────────
+# Uso:
+#   git clone <repo> ~/Dev/TaskManager
+#   cd ~/Dev/TaskManager && bash scripts/setup_loq.sh
+#   # Editar .env con API keys reales si no lo hiciste
+#   # Listo — docker compose ps
+# ═══════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
-OPENCLAW_WORKSPACE="$OPENCLAW_HOME/workspace"
 
-echo "══════════════════════════════════════════"
-echo "  TaskManager — LOQ Hub Setup"
-echo "══════════════════════════════════════════"
-echo "  Project root: $PROJECT_ROOT"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo ""
+echo -e "${GREEN}══════════════════════════════════════════${NC}"
+echo -e "${GREEN}  BT-Core TaskManager — Setup${NC}"
+echo -e "${GREEN}══════════════════════════════════════════${NC}"
+echo "  Project: $PROJECT_ROOT"
 echo ""
 
-# ─── 1. Check prerequisites ──────────────────────────────────────
-echo "[1/7] Checking prerequisites..."
+# ─── 1. Prerequisites ──────────────────────────────────────────
+echo "[1/5] Checking prerequisites..."
+
 MISSING=()
-for cmd in node npm docker python3; do
+for cmd in docker python3 ollama; do
   if ! command -v "$cmd" &>/dev/null; then
     MISSING+=("$cmd")
   fi
 done
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then
-  echo "ERROR: Missing required commands: ${MISSING[*]}"
+  echo -e "${RED}  ERROR: Missing: ${MISSING[*]}${NC}"
   echo ""
-  echo "Install them first:"
-  echo "  Node.js:  curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs"
-  echo "  Docker:   https://docs.docker.com/engine/install/"
-  echo "  Python:   sudo apt install python3 python3-pip python3-venv"
+  echo "  Install:"
+  echo "    Docker:  https://docs.docker.com/desktop/"
+  echo "    Python:  sudo apt install python3 python3-pip"
+  echo "    Ollama:  curl -fsSL https://ollama.com/install.sh | sh"
   exit 1
 fi
+echo -e "${GREEN}  docker, python3, ollama OK${NC}"
 
-NODE_VER=$(node --version | sed 's/v//' | cut -d. -f1)
-if [[ "$NODE_VER" -lt 22 ]]; then
-  echo "WARNING: Node.js $NODE_VER detected. Node 22+ recommended."
-fi
-echo "  node $(node --version), python3 $(python3 --version | cut -d' ' -f2), docker OK"
-
-# ─── 2. Install OpenClaw Gateway ─────────────────────────────────
+# ─── 2. .env setup ─────────────────────────────────────────────
 echo ""
-if ! command -v openclaw &>/dev/null; then
-  echo "[2/7] Installing OpenClaw..."
-  npm install -g openclaw@latest
-else
-  echo "[2/7] OpenClaw already installed ($(openclaw --version 2>/dev/null || echo 'unknown'))"
-fi
-
-# ─── 3. Onboard OpenClaw ─────────────────────────────────────────
-echo ""
-if [[ ! -d "$OPENCLAW_HOME" ]]; then
-  echo "[3/7] Running OpenClaw onboard..."
-  echo "  This will ask for your AI provider and API key."
-  echo "  Choose: Google / Gemini when prompted."
-  echo ""
-  openclaw onboard --install-daemon
-else
-  echo "[3/7] OpenClaw already onboarded ($OPENCLAW_HOME exists)"
-fi
-
-# ─── 4. Configure OpenClaw for TaskManager ────────────────────────
-echo ""
-echo "[4/7] Configuring OpenClaw..."
-
-# Copy openclaw.json config
-OPENCLAW_CONFIG="$OPENCLAW_HOME/openclaw.json"
-if [[ -f "$OPENCLAW_CONFIG" ]]; then
-  BACKUP="$OPENCLAW_CONFIG.backup.$(date +%Y%m%d_%H%M%S)"
-  cp "$OPENCLAW_CONFIG" "$BACKUP"
-  echo "  Backed up existing config to: $BACKUP"
-fi
-cp "$PROJECT_ROOT/openclaw/openclaw.json" "$OPENCLAW_CONFIG"
-echo "  → openclaw.json installed"
-
-# Symlink the taskmanager skill
-mkdir -p "$OPENCLAW_WORKSPACE/skills"
-SKILL_LINK="$OPENCLAW_WORKSPACE/skills/taskmanager"
-if [[ -L "$SKILL_LINK" ]]; then
-  rm "$SKILL_LINK"
-fi
-ln -s "$PROJECT_ROOT/openclaw/skills/taskmanager" "$SKILL_LINK"
-echo "  → taskmanager skill linked"
-
-# Copy agent identity files
-for md_file in AGENTS.md SOUL.md; do
-  SRC="$PROJECT_ROOT/openclaw/workspace/$md_file"
-  DST="$OPENCLAW_WORKSPACE/$md_file"
-  if [[ -f "$SRC" ]]; then
-    cp "$SRC" "$DST"
-    echo "  → $md_file copied"
-  fi
-done
-
-# ─── 5. Create .env from example if needed ───────────────────────
-echo ""
-echo "[5/7] Setting up environment..."
+echo "[2/5] Setting up .env..."
 if [[ ! -f "$PROJECT_ROOT/.env" ]]; then
   cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
-  echo "  ⚠ Created .env from .env.example"
-  echo "  ⚠ YOU MUST EDIT .env WITH REAL VALUES before starting!"
+  echo -e "${YELLOW}  Created .env from .env.example${NC}"
+  echo -e "${YELLOW}  YOU MUST EDIT IT with real API keys:${NC}"
   echo ""
-  echo "  Required values:"
-  echo "    POSTGRES_PASSWORD  — Choose a secure password"
-  echo "    GEMINI_API_KEY     — From https://aistudio.google.com/apikey"
-  echo "    TASKS_BOT_TOKEN    — From @BotFather in Telegram"
-  echo "    ALLOWED_USER_ID    — Your Telegram numeric user ID"
+  echo -e "    ${YELLOW}nano $PROJECT_ROOT/.env${NC}"
+  echo ""
+  echo "    Required:"
+  echo "      GEMINI_API_KEY       — https://aistudio.google.com/apikey"
+  echo "      DEEPSEEK_API_KEY     — https://platform.deepseek.com/api_keys"
+  echo "      BT_TASKS_BOT_TOKEN   — @BotFather in Telegram"
+  echo "      BT_ALLOWED_USER_ID   — Your Telegram numeric user ID"
+  echo ""
+  echo "  Run this script again after editing .env"
+  exit 0
 else
-  echo "  .env already exists"
-fi
-
-# Source .env for subsequent steps
-set -a
-source "$PROJECT_ROOT/.env"
-set +a
-
-# ─── 6. Start PostgreSQL + apply schema ─────────────────────────
-echo ""
-echo "[6/7] Starting PostgreSQL..."
-cd "$PROJECT_ROOT"
-docker compose up -d postgres
-
-echo "  Waiting for PostgreSQL to be healthy..."
-RETRIES=30
-until docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-hb_admin}" -d "${POSTGRES_DB:-heartbeat}" &>/dev/null; do
-  RETRIES=$((RETRIES - 1))
-  if [[ $RETRIES -le 0 ]]; then
-    echo "  ERROR: PostgreSQL did not become healthy in time"
+  UNset=()
+  for var in GEMINI_API_KEY DEEPSEEK_API_KEY BT_TASKS_BOT_TOKEN; do
+    val=$(grep "^${var}=" "$PROJECT_ROOT/.env" 2>/dev/null | cut -d= -f2- | xargs)
+    if [[ -z "$val" || "$val" == "your_"* ]]; then
+      UNset+=("$var")
+    fi
+  done
+  if [[ ${#UNset[@]} -gt 0 ]]; then
+    echo -e "${YELLOW}  These vars still have placeholders: ${UNset[*]}${NC}"
+    echo -e "${YELLOW}  Edit .env before continuing: nano $PROJECT_ROOT/.env${NC}"
     exit 1
   fi
-  sleep 1
-done
-echo "  PostgreSQL ready"
-
-echo "  Applying schema..."
-docker compose exec -T postgres psql -U "${POSTGRES_USER:-hb_admin}" -d "${POSTGRES_DB:-heartbeat}" \
-  < "$PROJECT_ROOT/db/schema.sql" 2>/dev/null || true
-echo "  Schema applied"
-
-# ─── 7. Python virtual environment + dependencies ───────────────
-echo ""
-echo "[7/7] Setting up Python environment..."
-if [[ ! -d "$PROJECT_ROOT/.venv" ]]; then
-  python3 -m venv "$PROJECT_ROOT/.venv"
-  echo "  Created .venv"
+  echo -e "${GREEN}  .env configured${NC}"
 fi
-source "$PROJECT_ROOT/.venv/bin/activate"
-pip install --quiet -r "$PROJECT_ROOT/requirements.txt"
-echo "  Dependencies installed"
 
-# ─── Done ────────────────────────────────────────────────────────
+# ─── 3. Ollama model ───────────────────────────────────────────
 echo ""
-echo "══════════════════════════════════════════"
-echo "  ✅ TaskManager setup complete!"
-echo "══════════════════════════════════════════"
+echo "[3/5] Pulling Ollama embedding model..."
+if ollama list 2>/dev/null | grep -q "nomic-embed-text"; then
+  echo -e "${GREEN}  nomic-embed-text already cached${NC}"
+else
+  echo "  Downloading nomic-embed-text (137M)..."
+  ollama pull nomic-embed-text
+  echo -e "${GREEN}  Model ready${NC}"
+fi
+
+# ─── 4. Docker Compose ─────────────────────────────────────────
 echo ""
-echo "Next steps:"
+echo "[4/5] Starting Docker services..."
+cd "$PROJECT_ROOT"
+docker compose up -d --build 2>&1
+
+sleep 5
+if docker compose ps 2>&1 | grep -q "healthy"; then
+  echo -e "${GREEN}  PostgreSQL healthy${NC}"
+fi
+
+echo "  Applying DB schema..."
+docker compose exec -T postgres psql -U hb_admin -d heartbeat \
+  -f /docker-entrypoint-initdb.d/01_schema.sql 2>/dev/null || true
+echo -e "${GREEN}  Schema applied${NC}"
+
+# ─── 5. Verify ─────────────────────────────────────────────────
 echo ""
-echo "  1. Edit .env with real values:"
-echo "     nano $PROJECT_ROOT/.env"
+echo "[5/5] Verifying..."
+if docker compose ps 2>&1 | grep -q "taskmanager_bot.*Up"; then
+  echo -e "${GREEN}  Bot running${NC}"
+else
+  echo -e "${RED}  Bot not running — check: docker compose logs bot${NC}"
+fi
+
+if docker compose ps 2>&1 | grep -q "taskmanager_heartbeat.*Up"; then
+  echo -e "${GREEN}  Heartbeat running${NC}"
+fi
+
+# ─── Done ──────────────────────────────────────────────────────
 echo ""
-echo "  2. Edit OpenClaw config with your Telegram token and user ID:"
-echo "     nano $OPENCLAW_CONFIG"
-echo "     Replace CONFIGURE_ME values"
+echo -e "${GREEN}══════════════════════════════════════════${NC}"
+echo -e "${GREEN}  Setup complete!${NC}"
+echo -e "${GREEN}══════════════════════════════════════════${NC}"
 echo ""
-echo "  3. Restart OpenClaw gateway:"
-echo "     openclaw gateway restart"
+echo "  docker compose ps"
+echo "  docker compose logs -f bot"
 echo ""
-echo "  4. Send a DM to your Tasks bot in Telegram"
-echo "     If using pairing: run 'openclaw pairing list telegram'"
-echo "     then 'openclaw pairing approve telegram <CODE>'"
+echo "  Test in Telegram @bt_tasks_bot:"
+echo "    /start"
+echo "    /add Terminar informe de métricas Q2"
 echo ""
-echo "  5. Test from CLI:"
-echo "     cd $PROJECT_ROOT && source .venv/bin/activate"
-echo "     python3 scripts/cli.py add --title \"Test task\" --priority 3"
-echo "     python3 scripts/cli.py list"
+echo "  Run tests:"
+echo "    cd $PROJECT_ROOT && python3 tests/test_suite.py --quick"
 echo ""

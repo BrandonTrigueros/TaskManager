@@ -1,7 +1,19 @@
+# ═══════════════════════════════════════════════════════════════
+# BT-Core TaskManager — Docker Compose
+#
+#   docker compose up -d          # postgres + bot + heartbeat
+#   docker compose logs -f bot    # Ver logs del bot
+#
+# Ollama corre en el host (GPU nativa, sin overhead de Docker).
+# Asegurate de tenerlo corriendo: ollama serve
+# Y el modelo bajado:              ollama pull nomic-embed-text
+# ═══════════════════════════════════════════════════════════════
+
 services:
+  # ─── PostgreSQL + pgvector ──────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: taskmanager_pg_dev
+    container_name: taskmanager_pg
     restart: unless-stopped
     environment:
       POSTGRES_DB: heartbeat
@@ -10,7 +22,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - pgdata_dev:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hb_admin -d heartbeat"]
@@ -18,5 +30,45 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── Telegram Bot ───────────────────────────────────────────
+  bot:
+    build: .
+    container_name: taskmanager_bot
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file: .env
+    environment:
+      BT_DB_HOST: postgres
+      BT_OLLAMA_URL: http://host.docker.internal:11434
+
+  # ─── Heartbeat (ciclo cada 60 min) ──────────────────────────
+  heartbeat:
+    build: .
+    container_name: taskmanager_heartbeat
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file: .env
+    environment:
+      BT_DB_HOST: postgres
+      BT_OLLAMA_URL: http://host.docker.internal:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "🫀 Heartbeat iniciado — ciclo cada 60 min"
+        while true; do
+          echo "[$$(date -u +%H:%M)] Ejecutando ciclo Grafo Vivo..."
+          python3 -m src.ingest.heartbeat
+          echo "[$$(date -u +%H:%M)] Ciclo completado. Esperando 60 min..."
+          sleep 3600
+        done
+
 volumes:
-  pgdata_dev:
+  pgdata:

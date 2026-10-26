@@ -4,6 +4,5 @@ psycopg2-binary>=2.9.9
 # ─── Image handling (OCR tool) ───
 Pillow>=10.0.0
 
-# ─── Telegram webhook harness (dev/test) ───
-flask>=3.0.0
-requests>=2.31.0
+# ─── Audio transcription (REQ-T3) ───
+faster-whisper>=1.0.0

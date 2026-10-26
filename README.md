@@ -1,110 +1,79 @@
-# TaskManager
+# BT-Core: TaskManager
 
-Módulo standalone de gestión de tareas, extraído de [BT-Core](https://github.com/BrandonTrigueros/BT-Core). Recibe tareas por Telegram (texto + fotos de pizarra) y CLI, las clasifica con IA, y las persiste en PostgreSQL.
+**Compañero silencioso de productividad.** Soltás una idea — por voz, foto de pizarra, texto en Telegram, o terminal — y el sistema clasifica, vincula, estima y ordena. Sin mover un dedo en organizar.
 
-## Estructura
+> **Diseño:** [ARCHITECTURE.md](ARCHITECTURE.md) (mecanismo del Grafo Vivo) ·
+> [DESIGN.md](DESIGN.md) (decisiones: por qué determinista y no agéntico)
 
-```
-TaskManager/
-├── ARCHITECTURE.md                       # Arquitectura, decisiones, estado de REQs
-├── docker-compose.yml                    # PostgreSQL 16 (dev)
-├── .env.example                          # Template de variables de entorno
-│
-├── db/
-│   └── schema.sql                        # Schema: tasks + enums (idempotente)
-│
-├── src/tools/
-│   ├── common.py                         # DB connection + Gemini REST API
-│   ├── TaskManager/
-│   │   ├── tasks.py                      # CRUD: add, list, complete, update, overdue
-│   │   └── classify_task.py              # Clasificación IA (Gemini Flash)
-│   └── SharedUtilities/
-│       ├── ocr.py                        # OCR: whiteboard, receipt, describe
-│       └── export_md.py                  # Export a Markdown/Obsidian
-│
-├── scripts/
-│   ├── cli.py                            # CLI router
-│   └── setup_loq.sh                      # Setup automatizado para LOQ Hub
-│
-└── openclaw/
-    ├── openclaw.json                     # Config de OpenClaw Gateway
-    ├── workspace/
-    │   ├── AGENTS.md                     # Identidad del agente
-    │   └── SOUL.md                       # Personalidad
-    └── skills/
-        └── taskmanager/
-            └── SKILL.md                  # Skill definition
-```
+## El problema que resuelve
 
-## Setup (LOQ Hub)
+Tus tareas están dispersas: libreta del trabajo, pizarra de la U, notas en el celular, chats de WhatsApp. Se pierden. TaskManager las centraliza en **una sola terminal** — da igual si entrás por Telegram o por CLI.
+
+## Cómo usarlo
+
+### Telegram (`@bt_task_bot`)
+
+| Comando | Qué hace |
+|---|---|
+| `/add Comprar materiales para el lab` | Crea tarea. La IA clasifica proyecto, prioridad, horas. |
+| `/list` | Lista pendientes con prioridades |
+| `/done 3 --hours 5.5` | Completa tarea #3, registra horas reales |
+| `/update 5 --priority 4 --due 2026-07-25` | Modifica prioridad, fecha |
+| `/overdue` | Tareas vencidas |
+| `/search presentación` | Busca tareas similares semánticamente |
+| `/tablero` | Vista compacta del dashboard |
+| `/export` | Genera archivos Markdown del estado actual |
+| 📸 Enviar foto | OCR automático → Vision Diff → tareas nuevas y completadas |
+| 🎙️ Enviar audio | Transcripción → clasificación → tarea creada |
+
+### Terminal (CLI)
 
 ```bash
-git clone https://github.com/BrandonTrigueros/TaskManager.git ~/TaskManager
-cd ~/TaskManager
-bash scripts/setup_loq.sh
-# Editar .env y ~/.openclaw/openclaw.json con valores reales
-openclaw gateway restart
+cd ~/Dev/FigureThisOut/TaskManager && source .venv/bin/activate
+
+python3 -m src.ingest.cli add --title "Lab 5 Empotrados" --embed
+python3 -m src.ingest.cli list
+python3 -m src.ingest.cli complete --id 3 --hours 6
+python3 -m src.ingest.cli overdue
+python3 -m src.ingest.cli classify "Terminar paper de CV"
+python3 -m src.ingest.cli ocr-whiteboard /tmp/pizarra.jpg
+python3 -m src.ingest.cli export
+python3 -m src.ingest.cli heartbeat --action all
 ```
 
-Prerequisitos: Node.js 22+, Docker, Python 3.11+, Tailscale.
+Cada módulo también es ejecutable por separado (`python3 -m src.processing.tasks list`)
+y siempre imprime JSON a stdout.
 
-## CLI
+## ¿Qué pasa por debajo?
+
+Cada tarea que creás dispara una cadena silenciosa:
+
+1. **Clasificación** (DeepSeek) → proyecto, prioridad, horas estimadas
+2. **Embedding** (Ollama, 768d) → vector semántico en pgvector
+3. **Linking** → se buscan las 5 tareas más similares por similitud coseno
+4. **Sesgo de realidad** → las horas estimadas se anclan en horas reales de tareas similares
+5. **Grafo** → `task_links` mantiene el mapa de relaciones actualizado
+
+## Setup rápido
 
 ```bash
-cd ~/TaskManager && source .venv/bin/activate
-
-# Tareas
-python3 scripts/cli.py add --title "Terminar Lab 2" --project Empotrados --priority 4
-python3 scripts/cli.py "comprar leche"              # shortcut: add-task
-python3 scripts/cli.py list --status pending
-python3 scripts/cli.py complete --id 1
-python3 scripts/cli.py update --id 1 --priority 5
-python3 scripts/cli.py overdue
-
-# IA
-python3 scripts/cli.py classify "Corregir el paper de detección de objetos"
-
-# OCR
-python3 scripts/cli.py ocr-whiteboard /path/to/photo.jpg
-
-# Export a Obsidian
-python3 scripts/cli.py export --output ~/Obsidian/TaskManager/
+git clone https://github.com/BrandonTrigueros/TaskManager.git ~/Dev/TaskManager
+cd ~/Dev/TaskManager
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+docker compose up -d
+docker exec -i taskmanager_pg psql -U hb_admin -d heartbeat -h localhost < db/schema.sql
+# Editar .env con GEMINI_API_KEY y DEEPSEEK_API_KEY
+ollama pull nomic-embed-text
+python3 -m src.ingest.bot &
 ```
 
-## Requerimientos (spec completo)
+Prerrequisitos: Docker, Python 3.11+, Ollama.
 
-### Ingesta (Input Layer)
+## Proyectos
 
-| REQ | Descripción | Estado |
-|-----|-------------|--------|
-| T1 | Multi-source: Telegram (texto, audio, fotos) + CLI | ✅ Parcial (audio pendiente) |
-| T2 | OCR de pizarras/cuadernos | ✅ |
-| T3 | Transcripción de audio | ❌ Pendiente |
+`Empotrados` `Computer Vision` `HPE` `Personal` `Universidad` `Finanzas` `Salud` `Hogar`
 
-### Procesamiento (Logic Layer)
+## Prioridades
 
-| REQ | Descripción | Estado |
-|-----|-------------|--------|
-| T4 | Diferenciación de cambios entre envíos sucesivos de la misma hoja | ❌ |
-| T5 | Linking de tareas relacionadas (grafo de similitud) | ❌ |
-| T6 | Categorización latente por proyecto (IA) | ✅ |
-| T7 | Estimación de horas usando contexto de tareas similares | ❌ |
-
-### Almacenamiento y Sincronización (Storage Layer)
-
-| REQ | Descripción | Estado |
-|-----|-------------|--------|
-| T8 | Vista Maestra: MASTER_LOG.md + por proyecto + por tarea (Obsidian linking) | ✅ |
-| T9 | Markdown Sync a Obsidian vault | ✅ |
-| T10 | Telegram: responder consultas + recordatorios | ✅ Parcial |
-| T11 | Telegram: actualizar estado de tareas | ✅ Parcial |
-| T12 | Telegram: recordatorios automáticos (cron) | ❌ |
-
-Ver [ARCHITECTURE.md](ARCHITECTURE.md) para detalles de diseño, flujo de datos, y plan de implementación.
-
-## Merge con BT-Core
-
-1. Copiar `src/tools/TaskManager/` y `SharedUtilities/` al tree de BT-Core
-2. Usar un solo `common.py` compartido
-3. Deduplicar ENUMs en `db/schema.sql` con `init.sql`
-4. Integrar `cli.py` en `cli_task.py` de BT-Core
+🟥 Crítico · 🟧 Urgente · 🟨 Importante · 🟦 Normal · ⬜ Bajo
