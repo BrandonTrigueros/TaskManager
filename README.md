@@ -2,6 +2,11 @@
 
 **Compañero silencioso de productividad.** Soltás una idea — por voz, foto de pizarra, texto en Telegram, o terminal — y el sistema clasifica, vincula, estima y ordena. Sin mover un dedo en organizar.
 
+> **Norte del producto:** decidir en 30 segundos qué hacer ahora, con evidencia
+> de tu propia historia. No un gestor de tareas: un motor de decisión que
+> **olvida a propósito**. Roadmap, criterios de aceptación y regla de kill en
+> [PRODUCT.md](PRODUCT.md).
+
 > **Diseño:** [ARCHITECTURE.md](ARCHITECTURE.md) (mecanismo del Grafo Vivo) ·
 > [DESIGN.md](DESIGN.md) (decisiones: por qué determinista y no agéntico)
 

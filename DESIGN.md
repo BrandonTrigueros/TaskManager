@@ -1,8 +1,8 @@
 # DESIGN.md — Decisiones de diseño
 
 > Documento de **por qué**, no de qué. El *qué* está en
-> [ARCHITECTURE.md](ARCHITECTURE.md) (mecanismo del Grafo Vivo) y en
-> [README.md](README.md) (uso).
+> [ARCHITECTURE.md](ARCHITECTURE.md) (mecanismo del Grafo Vivo), el *uso* en
+> [README.md](README.md) y el *para qué* en [PRODUCT.md](PRODUCT.md).
 >
 > Última revisión: 2026-10-26
 
@@ -135,14 +135,71 @@ en schema). Esta es la matriz vigente.
 | Geofencing | columnas en `db/schema.sql` | ⚠️ solo almacenamiento, sin disparador |
 | Entrega push de recordatorios | `heartbeat` imprime a stderr | ⚠️ requiere cron/systemd que lea esa salida |
 
+El ciclo completo de 6 capas lo ejecuta `heartbeat --action graph` (llama a
+`graph.run_full_cycle`). `--action sleep` agrega la consolidación, y `--action
+all` la incluye una sola vez al día a la hora de `HEARTBEAT_SLEEP_HOUR`
+(default 3). Requiere `numpy` y `scipy` — declarados en `requirements.txt`;
+sin `scipy`, la Capa 3 falla en cuanto hay ≥3 tareas enlazadas.
+
 ---
 
 ## Deuda técnica conocida
 
 | Ítem | Impacto |
 |---|---|
-| `.venv` es una copia de `/home/trigueros/Dev/TaskManager/.venv` | `activate` no cambia `sys.prefix`; hay que recrearlo (`python3 -m venv .venv && pip install -r requirements.txt`) |
-| `README.md` apuntaba a `scripts/cli.py` y `scripts/bot.py` | Ambos viven en `src/ingest/`; corregido |
-| `README.md` usaba el contenedor `taskmanager_pg_dev` | El nombre real es `taskmanager_pg`; corregido |
 | Geofencing sin lógica de disparo | Las columnas existen pero nada las consulta |
 | Recordatorios sin entrega | `heartbeat` los imprime; falta el cron que los envíe por Telegram |
+| Intérprete en 3.12.3 (Ubuntu) | Ver *Postura de seguridad*: falta el bloqueo de CA que llega en 3.12.16 |
+
+Resuelto (2026-10-26): `.venv` recreado desde cero con `python3 -m venv`;
+rutas del `README.md` (`src/ingest/cli.py`, `src/ingest/bot.py`, contenedor
+`taskmanager_pg`) corregidas.
+
+---
+
+## Postura de seguridad
+
+El entorno no se actualiza "a la última versión" a ciegas: se actualiza lo que
+corrige algo y se documenta lo que queda abierto.
+
+### Baseline actual
+
+| Componente | Versión | Estado |
+|---|---|---|
+| Ubuntu | 24.04.4 LTS (WSL2) | 78 paquetes al día (28 de seguridad) |
+| Python (intérprete) | 3.12.3 `ubuntu0.17` | soportado hasta 2028-10; falta backport de CVE-2026-115557 |
+| pip (venv) | 26.2.2 | al día, con `cert` fijado al bundle del sistema |
+| certifi | 2026.10.23 | sin la CA emSign |
+| `filelock` | 4.2.4 | por encima del parche (4.2.1) |
+| `virtualenv` | no instalado | inmune a los 36 hallazgos de oct-2026 |
+| Node.js | 24.22.1 | al día (línea LTS 24.x) |
+| `ca-certificates` | `20260816` | root emSign eliminado del bundle |
+
+### Decisiones
+
+1. **No se instala Python 3.15.2 ni se compila 3.12.16.** Se usa el intérprete
+   de Ubuntu y se depende de sus backports. Razón: 3.12 tiene soporte hasta
+   2028 y mezclar intérpretes rompe el supuesto de despliegue (contenedor
+   `python:3.12`).
+
+2. **`pip` se ancla al bundle del sistema.** Su `certifi` vendorizado
+   (`2026.10.19`) todavía incluía el root de emSign. Mitigación aplicada en
+   `.venv/pip.conf`:
+
+   ```ini
+   [global]
+   cert = /etc/ssl/certs/ca-certificates.crt
+   ```
+
+   Ese bundle ya no contiene la CA comprometida (*4 added, 5 removed* durante
+   el upgrade). `common.py` ya usaba ese mismo `cafile` para Gemini/DeepSeek,
+   así que las dos rutas TLS del proyecto quedan cubiertas.
+
+3. **`pip-audit` como verificación, no como gate.** `pip-audit` sobre el venv:
+   *No known vulnerabilities found*. Se corre a demanda porque un gate en CI
+   sobre un proyecto de un solo desarrollador genera ruido más que valor.
+
+4. **Auditoría del intérprete diferida, no ignorada.** Cuando Ubuntu publique
+   `python3.12 ubuntu0.18` (o python-build-standalone compilado 3.12.16, que
+   aún no existe en uv), `apt full-upgrade` cierra el último ítem sin migrar
+   nada.
