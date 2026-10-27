@@ -8,12 +8,17 @@
 
 ```mermaid
 flowchart TB
+    %% ═══ CLIENTE ═══
+    subgraph CLIENT["📱 CLIENTE"]
+        direction LR
+        APP["App Android<br/>(Kotlin + Compose)"] --> SRV["api/server.py<br/>:8787 · Bearer"]
+    end
+
     %% ═══ INGESTA ═══
     subgraph INGEST["📥 INGESTA"]
         direction LR
-        TG["📱 Telegram"] --> bot["bot.py"]
         CLI["💻 CLI"] --> cli["cli.py"]
-        IMG["📸 Foto"] --> ocr["ocr.py<br/>(Gemini Vision)"]
+        IMG["📸 Foto<br/>(cualquier soporte)"] --> ocr["ocr.py<br/>(Gemini Vision)"]
         AUD["🎙️ Audio"] --> trans["transcribe.py<br/>(Faster-Whisper)"]
     end
 
@@ -87,8 +92,7 @@ predicciones con datos reales (planning bias) y patrones conductuales (HeLa-Mem)
 
 ```
 TaskManager/
-├── db/schema.sql              # PostgreSQL + pgvector + co_occurrence + debt_log
-├── docker-compose.yml         # pgvector/pgvector:pg16
+├── db/schema.sql              # PostgreSQL + pgvector + decisions + debt_log
 │
 ├── src/
 │   ├── common.py              # SSOT: pool DB + Gemini + DeepSeek REST

@@ -11,7 +11,7 @@ Usage (from project root):
     python3 -m src.shared.export_md --output ~/ObsidianVault/TaskManager/
 
 Or via CLI:
-    python3 scripts/cli.py export [--output /path/to/dir]
+    python3 -m src.ingest.cli export [--output /path/to/dir]
 """
 
 import argparse
@@ -20,7 +20,7 @@ import os
 import sys
 from datetime import datetime
 
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 

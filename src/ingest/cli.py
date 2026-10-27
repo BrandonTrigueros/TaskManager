@@ -2,17 +2,17 @@
 """TaskManager CLI — Quick entry point for task management.
 
 Usage:
-    python3 scripts/cli.py add --title "comprar leche"
-    python3 scripts/cli.py "comprar leche"                → shortcut: add-task
-    python3 scripts/cli.py list [--status pending] [--project X]
-    python3 scripts/cli.py complete --id 42
-    python3 scripts/cli.py update --id 42 --priority 5
-    python3 scripts/cli.py overdue
-    python3 scripts/cli.py classify "Terminar Lab 2 de Empotrados"
-    python3 scripts/cli.py ocr-whiteboard /path/to/photo.jpg
+    python3 -m src.ingest.cli add --title "comprar leche"
+    python3 -m src.ingest.cli "comprar leche"             → shortcut: add-task
+    python3 -m src.ingest.cli list [--status pending] [--project X]
+    python3 -m src.ingest.cli complete --id 42
+    python3 -m src.ingest.cli update --id 42 --priority 5
+    python3 -m src.ingest.cli overdue
+    python3 -m src.ingest.cli classify "Terminar Lab 2 de Empotrados"
+    python3 -m src.ingest.cli ocr-whiteboard /path/to/photo.jpg
 
 Designed to run from the TaskManager/ project root.
-All DB/AI calls go to the LOQ hub transparently via Tailscale.
+All DB/AI calls go to localhost.
 """
 
 import os

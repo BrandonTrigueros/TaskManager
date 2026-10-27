@@ -168,7 +168,7 @@ PERF_TASKS = [
     ("Migrar CI de Jenkins a GitHub Actions", "Trabajo"),
     ("Implement dark mode en la web app", "Trabajo"),
     ("Escribir tests de integración para payments", "Trabajo"),
-    ("Configurar Tailscale en la Raspberry Pi", "Aprendizaje"),
+    ("Configurar el servidor de respaldo en la Raspberry Pi", "Aprendizaje"),
     ("Estudiar arquitectura de transformers", "Aprendizaje"),
     ("Hacer journaling — 10 minutos", "Salud"),
     ("Soldar el puente H del robot", "Empotrados"),

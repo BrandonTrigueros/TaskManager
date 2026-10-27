@@ -2,19 +2,20 @@
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════
-# BT-Core TaskManager — Setup (LOQ Hub / cualquier PC)
+# BT-Core TaskManager — Setup local (sin contenedores)
 #
 # Qué hace:
-#   1. Verifica prerequisites (Docker, Python, Ollama)
-#   2. Crea .env desde .env.example si no existe
-#   3. Baja el modelo de embeddings (nomic-embed-text)
-#   4. Levanta todo con docker compose up -d
+#   1. Verifica prerequisites (Python, PostgreSQL, Ollama)
+#   2. Crea el .env desde .env.example si no existe
+#   3. Crea el rol y la base si faltan, y aplica db/schema.sql
+#   4. Baja el modelo de embeddings (nomic-embed-text)
+#   5. Deja listo para: api/server.py + heartbeat + app Android
 #
 # Uso:
-#   git clone <repo> ~/Dev/TaskManager
-#   cd ~/Dev/TaskManager && bash scripts/setup_loq.sh
-#   # Editar .env con API keys reales si no lo hiciste
-#   # Listo — docker compose ps
+#   cd TaskManager && bash scripts/setup_loq.sh
+#
+# Prerrequisitos (Ubuntu/Debian, requieren sudo):
+#   sudo apt install postgresql-16 postgresql-16-pgvector
 # ═══════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,119 +28,102 @@ NC='\033[0m'
 
 echo ""
 echo -e "${GREEN}══════════════════════════════════════════${NC}"
-echo -e "${GREEN}  BT-Core TaskManager — Setup${NC}"
+echo -e "${GREEN}  BT-Core TaskManager — Setup local${NC}"
 echo -e "${GREEN}══════════════════════════════════════════${NC}"
 echo "  Project: $PROJECT_ROOT"
 echo ""
 
-# ─── 1. Prerequisites ──────────────────────────────────────────
-echo "[1/5] Checking prerequisites..."
+# ─── 1. Prerequisitos ───────────────────────────────────────────
+echo "[1/4] Verificando prerequisitos..."
 
-MISSING=()
-for cmd in docker python3 ollama; do
-  if ! command -v "$cmd" &>/dev/null; then
-    MISSING+=("$cmd")
+for cmd in python3 psql ollama; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo -e "${RED}  Falta: $cmd${NC}"
+    case "$cmd" in
+      psql)   echo "    sudo apt install postgresql-16 postgresql-16-pgvector" ;;
+      ollama) echo "    https://ollama.com/download" ;;
+      *)      echo "    sudo apt install $cmd" ;;
+    esac
+    exit 1
   fi
 done
 
-if [[ ${#MISSING[@]} -gt 0 ]]; then
-  echo -e "${RED}  ERROR: Missing: ${MISSING[*]}${NC}"
-  echo ""
-  echo "  Install:"
-  echo "    Docker:  https://docs.docker.com/desktop/"
-  echo "    Python:  sudo apt install python3 python3-pip"
-  echo "    Ollama:  curl -fsSL https://ollama.com/install.sh | sh"
-  exit 1
-fi
-echo -e "${GREEN}  docker, python3, ollama OK${NC}"
-
-# ─── 2. .env setup ─────────────────────────────────────────────
-echo ""
-echo "[2/5] Setting up .env..."
-if [[ ! -f "$PROJECT_ROOT/.env" ]]; then
-  cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
-  echo -e "${YELLOW}  Created .env from .env.example${NC}"
-  echo -e "${YELLOW}  YOU MUST EDIT IT with real API keys:${NC}"
-  echo ""
-  echo -e "    ${YELLOW}nano $PROJECT_ROOT/.env${NC}"
-  echo ""
-  echo "    Required:"
-  echo "      GEMINI_API_KEY       — https://aistudio.google.com/apikey"
-  echo "      DEEPSEEK_API_KEY     — https://platform.deepseek.com/api_keys"
-  echo "      BT_TASKS_BOT_TOKEN   — @BotFather in Telegram"
-  echo "      BT_ALLOWED_USER_ID   — Your Telegram numeric user ID"
-  echo ""
-  echo "  Run this script again after editing .env"
-  exit 0
-else
-  UNset=()
-  for var in GEMINI_API_KEY DEEPSEEK_API_KEY BT_TASKS_BOT_TOKEN; do
-    val=$(grep "^${var}=" "$PROJECT_ROOT/.env" 2>/dev/null | cut -d= -f2- | xargs)
-    if [[ -z "$val" || "$val" == "your_"* ]]; then
-      UNset+=("$var")
-    fi
-  done
-  if [[ ${#UNset[@]} -gt 0 ]]; then
-    echo -e "${YELLOW}  These vars still have placeholders: ${UNset[*]}${NC}"
-    echo -e "${YELLOW}  Edit .env before continuing: nano $PROJECT_ROOT/.env${NC}"
+if ! pg_isready -q 2>/dev/null; then
+  echo -e "${YELLOW}  PostgreSQL no responde. Intentando iniciarlo…${NC}"
+  if command -v systemctl >/dev/null 2>&1; then
+    sudo systemctl start postgresql
+  elif command -v pg_ctlcluster >/dev/null 2>&1; then
+    sudo pg_ctlcluster 16 main start
+  else
+    echo -e "${RED}  No sé cómo iniciar PostgreSQL en este sistema.${NC}"
     exit 1
   fi
-  echo -e "${GREEN}  .env configured${NC}"
 fi
 
-# ─── 3. Ollama model ───────────────────────────────────────────
-echo ""
-echo "[3/5] Pulling Ollama embedding model..."
-if ollama list 2>/dev/null | grep -q "nomic-embed-text"; then
-  echo -e "${GREEN}  nomic-embed-text already cached${NC}"
-else
-  echo "  Downloading nomic-embed-text (137M)..."
-  ollama pull nomic-embed-text
-  echo -e "${GREEN}  Model ready${NC}"
-fi
+echo -e "${GREEN}  python3, psql, ollama OK${NC}"
 
-# ─── 4. Docker Compose ─────────────────────────────────────────
-echo ""
-echo "[4/5] Starting Docker services..."
+# ─── 2. .env ────────────────────────────────────────────────────
+echo "[2/4] Configuración..."
 cd "$PROJECT_ROOT"
-docker compose up -d --build 2>&1
-
-sleep 5
-if docker compose ps 2>&1 | grep -q "healthy"; then
-  echo -e "${GREEN}  PostgreSQL healthy${NC}"
-fi
-
-echo "  Applying DB schema..."
-docker compose exec -T postgres psql -U hb_admin -d heartbeat \
-  -f /docker-entrypoint-initdb.d/01_schema.sql 2>/dev/null || true
-echo -e "${GREEN}  Schema applied${NC}"
-
-# ─── 5. Verify ─────────────────────────────────────────────────
-echo ""
-echo "[5/5] Verifying..."
-if docker compose ps 2>&1 | grep -q "taskmanager_bot.*Up"; then
-  echo -e "${GREEN}  Bot running${NC}"
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+  echo -e "${YELLOW}  .env creado desde .env.example — editá las API keys${NC}"
 else
-  echo -e "${RED}  Bot not running — check: docker compose logs bot${NC}"
+  echo "  .env ya existe"
 fi
 
-if docker compose ps 2>&1 | grep -q "taskmanager_heartbeat.*Up"; then
-  echo -e "${GREEN}  Heartbeat running${NC}"
+set -a
+# shellcheck disable=SC1091
+source <(grep -E '^[A-Z_]+=' .env | sed 's/#.*//')
+set +a
+
+DB_USER="${POSTGRES_USER:-hb_admin}"
+DB_NAME="${POSTGRES_DB:-heartbeat}"
+DB_PASS="${POSTGRES_PASSWORD:-changeme}"
+
+# ─── 3. Base de datos ───────────────────────────────────────────
+echo "[3/4] Preparando PostgreSQL..."
+
+sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" \
+  | grep -q 1 || \
+  sudo -u postgres psql -c "CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASS}'"
+
+sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" \
+  | grep -q 1 || \
+  sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+
+sudo -u postgres psql -d "${DB_NAME}" -c "CREATE EXTENSION IF NOT EXISTS vector" >/dev/null
+sudo -u postgres psql -d "${DB_NAME}" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm" >/dev/null
+
+PGPASSWORD="${DB_PASS}" psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" \
+  -v ON_ERROR_STOP=1 -q -f db/schema.sql
+echo -e "${GREEN}  schema aplicado en ${DB_NAME}${NC}"
+
+# ─── 4. Python + embeddings ─────────────────────────────────────
+echo "[4/4] Entorno Python y embeddings..."
+if [[ ! -d .venv ]]; then
+  python3 -m venv .venv
+  echo "  .venv creado"
+fi
+.venv/bin/python -m pip install -q --upgrade pip
+.venv/bin/python -m pip install -q -r requirements.txt
+
+if ollama list 2>/dev/null | grep -q "nomic-embed-text"; then
+  echo "  nomic-embed-text ya está"
+else
+  ollama pull nomic-embed-text
 fi
 
-# ─── Done ──────────────────────────────────────────────────────
+IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 echo ""
 echo -e "${GREEN}══════════════════════════════════════════${NC}"
-echo -e "${GREEN}  Setup complete!${NC}"
+echo -e "${GREEN}  Listo${NC}"
 echo -e "${GREEN}══════════════════════════════════════════${NC}"
 echo ""
-echo "  docker compose ps"
-echo "  docker compose logs -f bot"
+echo "  API para la app Android:"
+echo "    source .venv/bin/activate"
+echo "    python3 -m src.api.server"
 echo ""
-echo "  Test in Telegram @bt_tasks_bot:"
-echo "    /start"
-echo "    /add Terminar informe de métricas Q2"
-echo ""
-echo "  Run tests:"
-echo "    cd $PROJECT_ROOT && python3 tests/test_suite.py --quick"
+echo "  URL desde el emulador de Windows:  http://${IP:-<ip-wsl>}:${API_PORT:-8787}"
+echo "  Ciclo del grafo:                   python3 -m src.ingest.heartbeat --action graph"
 echo ""

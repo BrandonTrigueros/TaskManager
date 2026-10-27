@@ -81,7 +81,7 @@ for _ in range(5):  # max 5 levels up
 def _build_dsn() -> str:
     """Build PostgreSQL DSN from DB_DSN or individual env vars.
 
-    All values come from .env (loaded by _load_dotenv) or Docker environment.
+    All values come from .env (loaded by _load_dotenv) or the process environment.
     No hardcoded defaults — fails loud if misconfigured.
     """
     dsn = os.environ.get("DB_DSN")
@@ -98,7 +98,7 @@ def _build_dsn() -> str:
 DSN = _build_dsn()
 
 # Pool size — dimensionado para el Hub LOQ manejando requests simultáneos
-# de X220 + HP + Telegram webhook. Ajustar según carga.
+# de la app Android + procesos CLI. Ajustar según carga.
 _POOL_MIN = int(os.environ.get("DB_POOL_MIN", "2"))
 _POOL_MAX = int(os.environ.get("DB_POOL_MAX", "10"))
 

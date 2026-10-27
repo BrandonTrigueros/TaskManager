@@ -123,29 +123,42 @@ realidad).**
 
 El único objetivo: que abrir el sistema devuelva **una** decisión, no una lista.
 
-**Alcance:**
+**Alcance (implementado):**
 
-1. `src/processing/next_action.py` — calcula **una** unidad:
+1. `src/processing/next_action.py` — dos propuestas, no una:
+
+   | Slot | Candidatas | Fórmula |
+   |---|---|---|
+   | ⚡ **quick** | estimación ≤ 0.75 h o sin estimación | `score(E,V,D) × quick_weight(h)` |
+   | 🧠 **deep** | estimación ≥ 1.5 h | `deep_score` = valor × urgencia × (0.5 + 0.5·E) |
+
    ```
-   score = (expectancy × value) / (1 + impulsividad × demora)
-
-   expectancy = f(avg_actual_hours del cluster, CI)   # capa 4
-   value      = priority normalizada
-   demora     = horas hasta due_date (∞ → penaliza por staleness)
-   impulsividad = constante configurable (default 1.0)
+   score  = (E × V) / (1 + I × D/30) × bonus_vencida
+   E      = 1 / (1 + |planning_ratio - 1|)      # calibración del cluster (Capa 4)
+   V      = prioridad / 5
+   D      = días hasta el vencimiento (sin fecha → 15)
+   bonus_vencida = 1 + 0.5 · e^(-edad/10)       # decae, no secuestra el ranking
    ```
-   Devuelve además: por qué la eligió, duración esperada con rango, y un
-   **primer paso de 2 minutos**.
-2. Bot: `/hoy` → un mensaje, una acción, con botones
-   `[Hecho]` / `[Hoy no]`.
-3. **Cierre en un tap**: `[Hecho]` abre horas pre-cargadas desde la estimación
-   del cluster (`¿~3h?` `[3h]` `[más]` `[menos]`). Costo de cierre ≈ 0.
-4. Registrar cada decisión en una tabla `decisions` (`unit_id`, `score`,
-   `chosen_at`, `executed`, `actual_hours`) — es la materia prima de la
-   calibración futura.
 
-**Fórmula v0:** es una aproximación. Se calibra con datos de `decisions`, no
-antes.
+2. `/hoy` en el bot — dos tarjetas (arranque + bloque), cada una con
+   `[✅ Hecho]` / `[⏭ Hoy no]`.
+3. **Cierre en un tap**: `[Hecho]` ofrece tres horas reales (±50 % de la
+   estimación) y completa la tarea reusando `tasks complete`.
+4. Tabla `decisions` — `task_id`, `slot`, `score`, `expectancy`, `value_score`,
+   `demora_hours`, `estimate_hours`, `alternatives`, `rationale`, `executed`,
+   `actual_hours`, `closed_at`. Es la materia prima de la calibración.
+
+**Tres sesgos corregidos en v1** (los tres aparecieron corriendo `--demo`, no
+en el diseño):
+
+| Sesgo | Síntoma | Arreglo |
+|---|---|---|
+| **Bucle de culpa** | Con bonus por vencimiento fijo, las 3 primeras propuestas eran siempre las mismas tareas atrasadas | Bonus exponencial decreciente + lo vencido hace >30 d sale de la propuesta |
+| **Lo trivial gana** | "revisar el correo" (0.3 h) superaba a "entrenar el modelo" (6 h) | Dos slots: el bloque profundo no compite contra lo administrativo |
+| **Trampa de evitación** | El trabajo que mueve la aguja tiene `expectancy` baja (lo evitás), así que quedaba último | `deep_score` atenúa la expectativa al 50 %: lo importante y evitado sigue apareciendo |
+
+La fórmula sigue siendo v0 calibrable: se ajusta con datos de `decisions`, no
+antes. Para verla sin base de datos: `python3 -m src.processing.next_action --demo`.
 
 **Criterios de aceptación (14 días):**
 

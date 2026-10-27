@@ -11,7 +11,7 @@ Acciones (--action):
   all         Todo lo anterior; la consolidación entra sola una vez al día a
               la hora de HEARTBEAT_SLEEP_HOUR (default 3)
 
-Pensado para cron, systemd o el loop de docker-compose.
+Pensado para cron o systemd.
 stdout = JSON; avisos legibles por stderr.
 
 Usage:
@@ -101,8 +101,7 @@ def check_due_reminders(conn) -> list[dict]:
 
 # ─── Consolidación de sueño (Capa 5) ─────────────────────────
 # Con un ciclo de 60 min, comparar la hora local dispara una sola vez al día.
-# Si el ciclo tardara más de una hora podría saltarse el día; el loop de
-# docker-compose está dimensionado para ciclos de segundos.
+# Si el ciclo tardara más de una hora podría saltarse el día.
 SLEEP_HOUR = int(os.environ.get("HEARTBEAT_SLEEP_HOUR", "3"))
 
 

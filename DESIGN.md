@@ -115,7 +115,8 @@ en schema). Esta es la matriz vigente.
 
 | Capacidad | Módulo | Estado |
 |---|---|---|
-| Ingesta por Telegram (texto) | `ingest/bot.py` | ✅ |
+| Ingesta por CLI | `ingest/cli.py` | ✅ |
+| Ingesta por app Android | `android/` → `api/server.py` | ✅ |
 | Ingesta por foto de pizarra | `bot.py` → `ocr.py` → `vision_diff.py` | ✅ |
 | Ingesta por audio | `bot.py` → `shared/transcribe.py` | ✅ |
 | Ingesta por CLI | `ingest/cli.py` | ✅ |
@@ -148,7 +149,7 @@ sin `scipy`, la Capa 3 falla en cuanto hay ≥3 tareas enlazadas.
 | Ítem | Impacto |
 |---|---|
 | Geofencing sin lógica de disparo | Las columnas existen pero nada las consulta |
-| Recordatorios sin entrega | `heartbeat` los imprime; falta el cron que los envíe por Telegram |
+| Recordatorios sin entrega | `heartbeat` los imprime; falta que la app los consulte |
 | Intérprete en 3.12.3 (Ubuntu) | Ver *Postura de seguridad*: falta el bloqueo de CA que llega en 3.12.16 |
 
 Resuelto (2026-10-26): `.venv` recreado desde cero con `python3 -m venv`;

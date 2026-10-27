@@ -17,7 +17,7 @@ Usage (from project root):
     python3 -m src.processing.tasks overdue
 
 Or via CLI:
-    python3 scripts/cli.py add --title "..."
+    python3 -m src.ingest.cli add --title "..."
 """
 
 import argparse
@@ -26,7 +26,7 @@ import os
 import sys
 
 # Ensure project root is in sys.path for `from src.task_manager / src.shared / src.common import ...`
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
@@ -103,15 +103,12 @@ def add_task(args):
         )
         already_done = cur.fetchone()
         if already_done:
+            # No se deduplica contra una completada: recrear la tarea preserva
+            # el dato del Grafo Vivo (horas reales del ciclo anterior).
+            # Antes se intentaba devolver `existing_id`, variable que en esta
+            # rama no existe (venimos de `existing is None`) → UnboundLocalError.
             print(f"⚠️  Task similar to completed #{already_done[0]} — "
-                  f"creating new one ( Grafo Vivo data preserved)", file=sys.stderr)
-            jprint({
-                "ok": True, "id": existing_id, "title": title,
-                "project": project, "priority": priority,
-                "deduplicated": True,
-                "note": "Task with same title+project already pending, returning existing ID",
-            })
-            return existing_id
+                  f"creating new one (Grafo Vivo data preserved)", file=sys.stderr)
 
         # ── Embedding (REQ-T5, optional) ─────────────────────
         embedding_vector = None
