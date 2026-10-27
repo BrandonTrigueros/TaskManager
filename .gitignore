@@ -12,3 +12,7 @@ __pycache__/
 # ─── OS ───
 .DS_Store
 Thumbs.db
+
+# Binarios de pgvector descargados (no versionar)
+scripts/pgvector-win/
+**/__pycache__/

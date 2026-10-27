@@ -22,6 +22,8 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+import src._bootstrap  # noqa: F401  (UTF-8 + CA en Windows)
+
 from src.common import get_conn, deepseek_generate
 from src.knowledge.embeddings import classify_context
 from src.knowledge.graph import cluster_stats_for_task
