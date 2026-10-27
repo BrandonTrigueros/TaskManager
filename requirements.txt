@@ -6,3 +6,9 @@ Pillow>=10.0.0
 
 # ─── Audio transcription (REQ-T3) ───
 faster-whisper>=1.0.0
+
+# ─── Knowledge graph (src/knowledge/graph.py) ───
+# numpy: álgebra de distancias y pesos por capa
+# scipy: average-linkage + intervalos de confianza (Capa 3, comunidades)
+numpy>=1.26
+scipy>=1.11

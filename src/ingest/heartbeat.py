@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """BT-Core Heartbeat — 60-minute semantic coherence cycle (REQ-T12).
 
-Actions:
-  1. Backfill embeddings for tasks with embedding=NULL
-  2. Check for due reminders (due_date < NOW() + 24h)
-  3. Rebuild task_links graph
-  4. Sync Obsidian vault export
+Acciones (--action):
+  backfill    Embeddings para tareas con embedding NULL
+  reminders   Tareas por vencer en las próximas 24 h
+  graph       Ciclo completo del Grafo Vivo: co-ocurrencia (Capa H),
+              pesos temporales (2), comunidades (3), deuda estructural (6)
+  sleep       Lo anterior + consolidación (5): poda, fusión, archivado >90 d
+  export      Sincroniza el vault de Obsidian
+  all         Todo lo anterior; la consolidación entra sola una vez al día a
+              la hora de HEARTBEAT_SLEEP_HOUR (default 3)
 
-Designed to be called by OpenClaw Gateway heartbeat or cron.
-Output is JSON for composability with OpenClaw.
+Pensado para cron, systemd o el loop de docker-compose.
+stdout = JSON; avisos legibles por stderr.
 
 Usage:
-    python3 scripts/heartbeat.py
-    python3 scripts/heartbeat.py --action backfill    # only backfill
-    python3 scripts/heartbeat.py --action reminders   # only reminders
-    python3 scripts/heartbeat.py --action all         # full cycle (default)
+    python3 -m src.ingest.heartbeat
+    python3 -m src.ingest.heartbeat --action reminders
+    python3 -m src.ingest.heartbeat --action sleep
 """
 
 import argparse
@@ -96,60 +99,30 @@ def check_due_reminders(conn) -> list[dict]:
     ]
 
 
-def rebuild_task_graph(conn) -> int:
-    """Rebuild task_links for tasks updated in the last 2 hours.
+# ─── Consolidación de sueño (Capa 5) ─────────────────────────
+# Con un ciclo de 60 min, comparar la hora local dispara una sola vez al día.
+# Si el ciclo tardara más de una hora podría saltarse el día; el loop de
+# docker-compose está dimensionado para ciclos de segundos.
+SLEEP_HOUR = int(os.environ.get("HEARTBEAT_SLEEP_HOUR", "3"))
 
-    Returns number of links created/updated.
+
+def sleep_is_due(action: str, now: datetime | None = None) -> bool:
+    """¿Entra la consolidación en este ciclo?
+
+    - `--action sleep` consolida siempre (para cron explícito).
+    - `--action all` consolida solo en SLEEP_HOUR, una vez al día.
+    - `backfill` / `reminders` / `graph` / `export` nunca consolidan.
     """
-    with conn.cursor() as cur:
-        # Clear stale links for recently modified tasks
-        cur.execute(
-            """DELETE FROM task_links
-               WHERE task_id IN (
-                   SELECT id FROM tasks
-                   WHERE updated_at > NOW() - INTERVAL '2 hours'
-               )
-               OR linked_task_id IN (
-                   SELECT id FROM tasks
-                   WHERE updated_at > NOW() - INTERVAL '2 hours'
-               )"""
-        )
-        cleared = cur.rowcount
-
-        # Get all tasks with embeddings
-        cur.execute(
-            "SELECT id, embedding FROM tasks WHERE embedding IS NOT NULL"
-        )
-        tasks = [(r[0], r[1]) for r in cur.fetchall()]
-
-        # Rebuild: for each task, find top-3 similar by cosine distance
-        link_count = 0
-        for task_id, emb in tasks:
-            # emb from psycopg2 is a string already in pgvector format: [0.1, -0.2, ...]
-            cur.execute(
-                """INSERT INTO task_links (task_id, linked_task_id, similarity)
-                   SELECT %s, id, 1 - (embedding <=> %s::vector)
-                   FROM tasks
-                   WHERE id != %s
-                     AND embedding IS NOT NULL
-                   ORDER BY embedding <=> %s::vector
-                   LIMIT 3
-                   ON CONFLICT (task_id, linked_task_id)
-                   DO UPDATE SET similarity = EXCLUDED.similarity""",
-                (task_id, emb, task_id, emb),
-            )
-            link_count += cur.rowcount
-
-        conn.commit()
-
-    return link_count
+    if action == "sleep":
+        return True
+    if action != "all":
+        return False
+    return (now or datetime.now()).hour == SLEEP_HOUR
 
 
 def run_heartbeat(action: str = "all") -> dict:
-    """Execute the heartbeat cycle.
-
-    Returns a dict with results for OpenClaw to parse and dispatch.
-    """
+    """Ejecuta el ciclo y devuelve un dict serializable con el resultado
+    de cada acción."""
     conn = get_conn()
     result = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -166,9 +139,16 @@ def run_heartbeat(action: str = "all") -> dict:
             result["due_reminders"] = due
             result["due_count"] = len(due)
 
-        if action in ("graph", "all"):
-            n = rebuild_task_graph(conn)
-            result["graph_links"] = n
+        if action in ("graph", "all", "sleep"):
+            # Import perezoso: `backfill` y `reminders` deben funcionar aunque
+            # scipy no esté instalado (solo lo requiere la Capa 3).
+            from src.knowledge.graph import run_full_cycle
+
+            include_sleep = sleep_is_due(action)
+            cycle = run_full_cycle(conn, include_sleep=include_sleep)
+            result["graph_cycle"] = cycle
+            result["graph_links"] = cycle.get("semantic_links", 0)
+            result["sleep_ran"] = include_sleep
 
         if action in ("export", "all"):
             import io, contextlib
@@ -194,7 +174,7 @@ def main():
     parser = argparse.ArgumentParser(description="BT-Core Heartbeat (60min cycle)")
     parser.add_argument(
         "--action",
-        choices=["all", "backfill", "reminders", "graph", "export"],
+        choices=["all", "backfill", "reminders", "graph", "sleep", "export"],
         default="all",
     )
     args = parser.parse_args()
@@ -210,7 +190,7 @@ def main():
             p = priority_emoji.get(t["priority"], "⬜")
             print(f"  {p} #{t['id']} — {t['title']} [{t['project']}]", file=sys.stderr)
 
-    # Print JSON result for OpenClaw (stdout = machine-readable)
+    # stdout = JSON legible por máquina (cron, bot, jq)
     print(json.dumps(result, default=str, ensure_ascii=False))
 
 
