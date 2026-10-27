@@ -1,0 +1,11 @@
+# Android / Gradle
+local.properties
+.gradle/
+build/
+*.apk
+*.aab
+
+# Python
+__pycache__/
+*.pyc
+.kotlin/

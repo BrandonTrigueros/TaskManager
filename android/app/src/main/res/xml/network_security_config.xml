@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  El backend es un proceso local en la LAN (o por Tailscale), servido en HTTP
+  sin TLS. Por eso se permite cleartext. No exponer este servidor a internet.
+  En producción, el paso natural es TLS con un certificado propio y
+  <base-config cleartextTrafficPermitted="false">.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
