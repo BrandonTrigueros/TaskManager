@@ -211,3 +211,35 @@ CREATE TABLE IF NOT EXISTS structural_debt_log (
     total_links     INTEGER,
     total_communities INTEGER
 );
+
+-- ─── Decisions (M1: "una decisión al día") ────────────────────
+--   Registra cada propuesta de next_action.py y su desenlace.
+--   Es la materia prima para calibrar la fórmula de score:
+--   sin esta tabla, M1 no puede mejorar con el uso.
+
+CREATE TABLE IF NOT EXISTS decisions (
+    id              SERIAL PRIMARY KEY,
+    task_id         INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    slot            VARCHAR(8),        -- 'quick' (arranque) | 'deep' (bloque)
+    score           DECIMAL(8,4) NOT NULL,
+    expectancy      DECIMAL(5,4),      -- [0,1] calibración histórica del cluster
+    value_score     DECIMAL(5,4),      -- [0,1] prioridad normalizada
+    demora_hours    DECIMAL(10,2),     -- horas hasta el vencimiento (NULL = sin fecha)
+    estimate_hours  DECIMAL(5,2),      -- expectativa mostrada al usuario
+    alternatives    INTEGER,           -- pendientes consideradas
+    rationale       TEXT,              -- por qué se eligió
+    chosen_at       TIMESTAMPTZ DEFAULT NOW(),
+    executed        BOOLEAN,           -- NULL = sin respuesta todavía
+    actual_hours    DECIMAL(5,2),      -- horas reales al cerrar
+    closed_at       TIMESTAMPTZ
+);
+
+-- Idempotente: instalaciones previas sin la columna `slot`
+ALTER TABLE decisions ADD COLUMN IF NOT EXISTS slot VARCHAR(8);
+
+CREATE INDEX IF NOT EXISTS idx_decisions_task
+    ON decisions(task_id, chosen_at DESC);
+CREATE INDEX IF NOT EXISTS idx_decisions_recent
+    ON decisions(chosen_at DESC);
+CREATE INDEX IF NOT EXISTS idx_decisions_open
+    ON decisions(chosen_at DESC) WHERE executed IS NULL;

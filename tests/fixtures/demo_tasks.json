@@ -1,0 +1,101 @@
+{
+  "_comment": "Corpus de demostración para `next_action.py --demo`. Las tareas imitan capturas reales: vagas, con typos, sin fecha o sin prioridad. Los `projects` son stats de cluster SIMULADOS (size, avg_actual_hours, std, planning_ratio, IC) para que el campo `why` muestre una calibración plausible sin necesidad de base de datos.",
+  "projects": {
+    "Empotrados": {
+      "size": 6,
+      "avg_actual_hours": 3.8,
+      "std_actual_hours": 1.1,
+      "planning_ratio": 1.7,
+      "ci_lower": 2.7,
+      "ci_upper": 4.9
+    },
+    "Computer Vision": {
+      "size": 4,
+      "avg_actual_hours": 6.2,
+      "std_actual_hours": 2.3,
+      "planning_ratio": 2.1,
+      "ci_lower": 3.9,
+      "ci_upper": 8.5
+    },
+    "HPE": {
+      "size": 9,
+      "avg_actual_hours": 2.1,
+      "std_actual_hours": 0.7,
+      "planning_ratio": 1.2,
+      "ci_lower": 1.4,
+      "ci_upper": 2.8
+    },
+    "Personal": {
+      "size": 5,
+      "avg_actual_hours": 1.4,
+      "std_actual_hours": 0.5,
+      "planning_ratio": 1.0,
+      "ci_lower": 0.9,
+      "ci_upper": 1.9
+    },
+    "Universidad": {
+      "size": 7,
+      "avg_actual_hours": 4.5,
+      "std_actual_hours": 1.6,
+      "planning_ratio": 1.9,
+      "ci_lower": 2.9,
+      "ci_upper": 6.1
+    },
+    "Finanzas": {
+      "size": 3,
+      "avg_actual_hours": 0.8,
+      "std_actual_hours": 0.3,
+      "planning_ratio": 0.9,
+      "ci_lower": 0.5,
+      "ci_upper": 1.1
+    },
+    "Salud": {
+      "size": 2,
+      "avg_actual_hours": 1.0,
+      "std_actual_hours": 0.2,
+      "planning_ratio": 1.1,
+      "ci_lower": 0.8,
+      "ci_upper": 1.2
+    },
+    "Hogar": {
+      "size": 4,
+      "avg_actual_hours": 1.2,
+      "std_actual_hours": 0.6,
+      "planning_ratio": 1.3,
+      "ci_lower": 0.6,
+      "ci_upper": 1.8
+    }
+  },
+  "tasks": [
+    { "title": "terminar el lab 5 de empotrados", "project": "Empotrados", "priority": 4, "estimated_hours": 3.0, "due_in_days": 1 },
+    { "title": "estudiar para el quiz de mate discreta", "project": "Universidad", "priority": 4, "estimated_hours": null, "due_in_days": 2 },
+    { "title": "mandar el reporte de gastos a rh", "project": "HPE", "priority": 5, "estimated_hours": 1.5, "due_in_days": -2 },
+    { "title": "arreglar el bug del endpoint /tasks q se cae con nulls", "project": "HPE", "priority": 4, "estimated_hours": 2.0, "due_in_days": 3 },
+    { "title": "leer el paper de diffusion models pa la clase", "project": "Computer Vision", "priority": 3, "estimated_hours": 5.0, "due_in_days": 6 },
+    { "title": "preguntarle a andres si ya subio las notas", "project": "Universidad", "priority": 2, "estimated_hours": null, "due_in_days": null },
+    { "title": "comprar cables hdmi y un adaptador usb-c", "project": "Hogar", "priority": 2, "estimated_hours": 1.0, "due_in_days": 4 },
+    { "title": "pagar la luz antes del corte", "project": "Finanzas", "priority": 5, "estimated_hours": 0.5, "due_in_days": -1 },
+    { "title": "sacar cita con el dentista", "project": "Salud", "priority": 3, "estimated_hours": 0.5, "due_in_days": null },
+    { "title": "actualizar el readme del repo con lo de m1", "project": "Empotrados", "priority": 3, "estimated_hours": 1.5, "due_in_days": 2 },
+    { "title": "preparar la demo pa la reunion del jueves", "project": "HPE", "priority": 5, "estimated_hours": 2.5, "due_in_days": 3 },
+    { "title": "revisar el correo de hpE del onboarding", "project": "HPE", "priority": 3, "estimated_hours": 0.5, "due_in_days": null },
+    { "title": "ver lo de la beca", "project": "Universidad", "priority": 2, "estimated_hours": null, "due_in_days": null },
+    { "title": "escribir el informe de laboratorio 3", "project": "Empotrados", "priority": 4, "estimated_hours": 4.0, "due_in_days": 5 },
+    { "title": "entrenar el modelo con el dataset nuevo", "project": "Computer Vision", "priority": 4, "estimated_hours": 8.0, "due_in_days": 9 },
+    { "title": "llamar al banco x el cobro duplicado", "project": "Finanzas", "priority": 4, "estimated_hours": 1.0, "due_in_days": 0 },
+    { "title": "ordenar el cuarto", "project": "Hogar", "priority": 1, "estimated_hours": null, "due_in_days": null },
+    { "title": "mandar cv a la pasantia de microsoft", "project": "Personal", "priority": 5, "estimated_hours": 1.0, "due_in_days": -3 },
+    { "title": "leer el capitulo 4 de embebidos", "project": "Universidad", "priority": 3, "estimated_hours": 2.0, "due_in_days": 7 },
+    { "title": "revisar el pr de juan", "project": "HPE", "priority": 3, "estimated_hours": 1.0, "due_in_days": 1 },
+    { "title": "comprar materiales pa la practica", "project": "Empotrados", "priority": 3, "estimated_hours": 1.0, "due_in_days": 2 },
+    { "title": "anotar ideas pa el proyecto final", "project": "Universidad", "priority": 2, "estimated_hours": null, "due_in_days": null },
+    { "title": "configurar el backup automatico", "project": "Personal", "priority": 2, "estimated_hours": 2.0, "due_in_days": 15 },
+    { "title": "renovar el seguro del carro", "project": "Finanzas", "priority": 4, "estimated_hours": 1.5, "due_in_days": 12 },
+    { "title": "hacer la rutina de ejercicios", "project": "Salud", "priority": 2, "estimated_hours": 1.0, "due_in_days": null },
+    { "title": "limpiar la base de datos de tareas viejas", "project": "Empotrados", "priority": 2, "estimated_hours": 1.0, "due_in_days": 20 },
+    { "title": "responder el mensaje de la profe", "project": "Universidad", "priority": 3, "estimated_hours": 0.3, "due_in_days": -1 },
+    { "title": "revisar los logs del servidor", "project": "HPE", "priority": 3, "estimated_hours": 1.5, "due_in_days": null },
+    { "title": "probar el ocr con fotos de cuaderno", "project": "Computer Vision", "priority": 3, "estimated_hours": 2.0, "due_in_days": 4 },
+    { "title": "ordenar las fotos del celular", "project": "Personal", "priority": 1, "estimated_hours": 3.0, "due_in_days": null }
+  ]
+}
